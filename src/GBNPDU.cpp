@@ -38,6 +38,7 @@ std::string GBNPDU::Serialize() {
     std::string pdu_frame;
 
     pdu_frame.append(MAGIC_NUM);
+    insert_u8((uint8)finf_,pdu_frame);
     insert_u8((uint8)ackf_,pdu_frame);
     insert_u16(num_,   pdu_frame);
     insert_u16(length_,pdu_frame);
@@ -55,6 +56,7 @@ std::string GBNPDU::Serialize() {
 }
 
 
+// TODO: heavy copy here , need reduce of copyng data_
 void GBNPDU::Deserialize(std::string &bytestream) {
     if(
         !CheckSumCal(bytestream) ||
@@ -66,6 +68,8 @@ void GBNPDU::Deserialize(std::string &bytestream) {
 
     // TODO: reduce copy here
     bytestream.erase(0,sizeof(MAGIC_NUM)-1);
+    finf_   = retrieve_u8(bytestream);
+    bytestream.erase(0,1);
     ackf_   = retrieve_u8(bytestream);
     bytestream.erase(0,1);
     num_    = retrieve_u16(bytestream);
@@ -83,12 +87,13 @@ GBNPDU::GBNPDU(GBNPDU::uint16 acknum) {
     checksum_ = 0;
 }
 
-GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data) {
+GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) {
     if(data.length()>LARGEST_DATA_SIZE){
         malformed_ = true;
         return;
     }
     data_   = data;
+    finf_   = fin;
     length_ = data_.length();
     num_    = seqnum;
     ackf_   = false;
@@ -112,12 +117,10 @@ static inline uint16_t crc16_ccitt_update(uint8_t byte, uint16_t crc) {
         /* If leftmost bit of the CRC is 1, we will XOR with
          * the polynomial later */
         xor_flag = crc & 0x8000;
-
         /* Shift the CRC, and append the next bit of the
          * message to the rightmost side of the CRC */
         crc <<= 1;
         crc |= (byte & (1 << i)) ? 1 : 0;
-
         /* Perform the XOR with the polynomial */
         if (xor_flag)
             crc ^= 0x1021;
@@ -149,7 +152,6 @@ bool GBNPDU::CheckSumCal(const std::string& data) {
     for(auto const &x:data){
         crc = crc16_ccitt_update(x,crc);
     }
-
     return crc==0;
 }
 

@@ -1,0 +1,8 @@
+//
+// Created by no3core on 2024/4/26.
+//
+
+#ifndef GOBACKN_GBNCONNECTION_H
+#define GOBACKN_GBNCONNECTION_H
+
+#endif //GOBACKN_GBNCONNECTION_H

@@ -26,7 +26,7 @@ int main(){
 
     // generate data package
     std::string data1 = "1234";
-    GBNPDU PkgGenTest(0x1234,data1);
+    GBNPDU PkgGenTest(0x1234,data1, false);
     auto PkgGenTest_frame1 = PkgGenTest.Serialize();
     GBNPDU::HexDump(PkgGenTest_frame1);
 
@@ -48,7 +48,7 @@ int main(){
 
     // generate data package 2
     std::string data2 = "";
-    GBNPDU PkgGenTest2(-1,data2);
+    GBNPDU PkgGenTest2(-1,data2, false);
     auto PkgGenTest_frame3 = PkgGenTest2.Serialize();
     GBNPDU::HexDump(PkgGenTest_frame3);
 }

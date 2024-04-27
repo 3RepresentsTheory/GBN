@@ -32,7 +32,7 @@ int main() {
             sockfd,
             EPOLLIN,
             [sockfd](){
-                std::cout << "udp package received!" <<std::endl;
+//                std::cout << "udp package received!" <<std::endl;
                 char buffer[BUFFER_SIZE];
                 sockaddr_in clientAddr{};
                 socklen_t addrLen = sizeof(clientAddr);
