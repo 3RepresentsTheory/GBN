@@ -7,6 +7,7 @@
 
 
 #include <cstdint>
+#include <stdexcept>
 #include "GBNByteStream.h"
 
 
@@ -24,12 +25,12 @@ public:
     }
     void StartResetAlarm(){
         iscounting_ = true;
-        total_time_ = time_remain_;
+        time_remain_= total_time_;
         istimeout_  = false;
     }
     void EndAlarm(){
         iscounting_ = false;
-        total_time_ = time_remain_;
+        time_remain_ = total_time_;
         istimeout_  = false;
     }
     void TimeElasp(uint64_t ms){
@@ -50,19 +51,24 @@ private:
     static const uint16_t DEFAULT_TIME_OUT_ = 500;
 
     ByteStream sender_stream_;
+    std::deque<GBNPDU> sender_queue_;
     Alarm    alarm_;
     uint16_t win_size_;
 
-    uint16_t seq_has_acked_ = 0;
+    uint16_t seq_has_acked_ = 0; // seqnum < this has been acked
+
     uint16_t next_seq_ = 0;
 public:
     GBNSender(
             uint16_t win_size = DEFAULT_WIN_,
             uint16_t time_out = DEFAULT_TIME_OUT_
-    ):win_size_(win_size), alarm_(time_out){}
-    void send_ack(uint16_t ackno);
+    ):win_size_(win_size), alarm_(time_out){
+        if(win_size==0)
+            throw std::runtime_error("GBNSender cannot use zero window");
+    }
+    void SendAck(uint16_t ackno);
 
-    void time_elasped(uint64_t ms_ticked);
+    void TimeElasped(uint64_t ms_ticked);
 
     // properly set the seq and so on
     /*
@@ -70,9 +76,12 @@ public:
      *  ack receive: update the window and send more pkg;
      *  user write:  user write to the socket, then try its best to fill up window;
      */
-    void fill_window();
+    void FillWindow();
 
-    void ack_received(uint16_t ackno);
+    void AckReceived(uint16_t ackno);
+
+    std::deque<GBNPDU>&GetSenderQueue(){return sender_queue_;};
+    ByteStream &GetStream(){return sender_stream_;};
 };
 
 #endif //GOBACKN_GBNSENDER_H

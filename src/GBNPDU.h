@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <stdexcept>
 
 
 /*
@@ -65,7 +66,7 @@ public:
     // Deserialize construct
     GBNPDU(std::string &&frame);
 
-    std::string Serialize();
+    std::string Serialize ()const;
     void Deserialize(std::string& bytestream);
 
     bool IsFormated(){return !malformed_;};

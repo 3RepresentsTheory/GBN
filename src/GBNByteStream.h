@@ -25,7 +25,7 @@ public:
     size_t Read(char* buffer,size_t n);
     size_t Write(const char*buffer,size_t n);
     size_t Write(const std::string& string);
-    void   PushPDU(GBNPDU& moved_pdu);
+    void   PushPDU(const GBNPDU& moved_pdu);
     void   SetEof(){iseof_ = true;}
 
     bool   IsEofed(){return iseof_;}

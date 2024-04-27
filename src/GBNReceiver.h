@@ -29,16 +29,23 @@
 
 class GBNReceiver{
     ByteStream receiver_stream_;
-    uint16_t seq_ = 0;
+    uint16_t expected_seq_ = 0;
 public:
-    void PkgReceived(GBNPDU&moved_pdu){
-        if(moved_pdu.GetNum()==seq_){
-            seq_++;
+    // make sure only data pkg move to here
+    void PkgReceived(const GBNPDU&moved_pdu){
+        if(receiver_stream_.IsEofed()) return;
+        if(moved_pdu.GetNum() == expected_seq_){
+            expected_seq_++;
             receiver_stream_.PushPDU(moved_pdu);
             if(moved_pdu.Fin()) receiver_stream_.SetEof();
         }
     }
     ByteStream& GetStream(){return receiver_stream_;}
+
+
+    // notice that seq_ indicating the next expected seq, a
+    // ckno == expected_seq_-1
+    uint16_t GetRecvNum(){return expected_seq_;}
 };
 
 #endif //GOBACKN_GBNRECEIVER_H

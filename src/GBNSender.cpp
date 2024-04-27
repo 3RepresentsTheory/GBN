@@ -4,60 +4,75 @@
 
 #include "GBNSender.h"
 
-void GBNSender::send_ack(uint16_t ackno) {
-
+void GBNSender::SendAck(uint16_t ackno) {
+    sender_queue_.emplace_back(GBNPDU(ackno));
 }
 
-void GBNSender::time_elasped(uint64_t ms_ticked) {
+void GBNSender::TimeElasped(uint64_t ms_ticked) {
     if(alarm_.IsCounting()){
         alarm_.TimeElasp(ms_ticked);
         if(alarm_.IsTimeOut()){
             // get retransmission
             alarm_.StartResetAlarm();
-            int i = seq_has_acked_ + 1;
+            int i = seq_has_acked_;
             for(auto &pkg: sender_stream_.GetFrames()) {
                 if(i!=next_seq_){
-                    // send pkg to the epoll
-                    //...
-                    //
+                    sender_queue_.push_back(pkg);
+                    i++;
                 }
             }
         }
     }
 }
 
-void GBNSender::fill_window() {
+void GBNSender::FillWindow() {
+    int i = 0;
+    int skip = next_seq_-seq_has_acked_;
     for(auto &pkg: sender_stream_.GetFrames()){
         if(next_seq_-seq_has_acked_>=win_size_)
             break;
+
+        if(i<skip){
+            i++;
+            continue;
+        }
+
         pkg.ackf_ = false;
         pkg.num_  = next_seq_;
 
-        if(next_seq_==seq_has_acked_+1)
+        if(next_seq_==seq_has_acked_)
             // alarm for the first package
             alarm_.StartResetAlarm();
 
-        // send pkg to the epoll
-        //...
-        //
+        sender_queue_.push_back(pkg);
         next_seq_++;
     }
+
+    // stop timer if no more data to fill up window
+    if(
+            next_seq_==seq_has_acked_
+//            sender_stream_.GetFrames().empty() ??
+    )
+        alarm_.EndAlarm();
 }
 
-void GBNSender::ack_received(uint16_t ackno) {
-    if(ackno>next_seq_ || ackno)
+void GBNSender::AckReceived(uint16_t ackno) {
+    if(ackno>=next_seq_ || ackno<seq_has_acked_)
         // skip the invaild or outdated ackno
         return;
 
     // drop the pkg that has been acked:
     auto & frames = sender_stream_.GetFrames();
-    int seqno= frames.front().num_;
-    while(seqno<=ackno){
-        frames.pop_front();
+    int seqno;
+    while(true){
         seqno = frames.front().num_;
+        frames.pop_front();
+        if(seqno==ackno) break;
     }
 
-    seq_has_acked_ = ackno;
-    fill_window();
+    seq_has_acked_ = ackno+1;
+    // restart the timer for seq_has_acked:
+    alarm_.StartResetAlarm();
+    FillWindow();
 }
 

@@ -34,7 +34,7 @@ static uint8_t retrieve_u8(const std::string&frame){
 }
 
 // make all little endian
-std::string GBNPDU::Serialize() {
+std::string GBNPDU::Serialize() const{
     std::string pdu_frame;
 
     pdu_frame.append(MAGIC_NUM);
@@ -90,7 +90,7 @@ GBNPDU::GBNPDU(GBNPDU::uint16 acknum) {
 GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) {
     if(data.length()>LARGEST_DATA_SIZE){
         malformed_ = true;
-        return;
+        throw std::runtime_error("GBNPDU data is too large");
     }
     data_   = data;
     finf_   = fin;

@@ -50,11 +50,12 @@ size_t ByteStream::Write(const char *buffer, size_t n) {
     return p-buffer;
 }
 
+// simply for TEST use, string may bind to "" , please specify len here
 size_t ByteStream::Write(const std::string &string) {
     return Write(string.c_str(), string.length());
 }
 
-void ByteStream::PushPDU(GBNPDU &moved_pdu) {
+void ByteStream::PushPDU(const GBNPDU &moved_pdu) {
     pdu_frames_.emplace_back(std::move(moved_pdu));
 }
 
