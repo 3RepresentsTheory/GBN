@@ -25,7 +25,6 @@ private:
     GBNConnection connection_;
 
     sockaddr_in peer_addr_;
-
     uint16_t    local_port_;
 
     std::mutex     read_mtx_;
@@ -39,9 +38,22 @@ private:
     void FrameSent(int eventfd);
 
 public:
+    // create a listening socket
     GBNSocket(
             uint16_t local_port
     );
+
+    // create a client socket
+    GBNSocket(
+            uint16_t local_port,
+            uint16_t peer_port,
+            const std::string& peer_ip
+    ): GBNSocket(local_port){
+        peer_addr_.sin_family = AF_INET;
+        peer_addr_.sin_port   = peer_port;
+        if(inet_pton(AF_INET,peer_ip.c_str(),&(peer_addr_.sin_addr))<0)
+            throw std::runtime_error("invalid peer address");
+    }
 
     ~GBNSocket();
 
