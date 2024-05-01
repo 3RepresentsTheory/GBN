@@ -24,6 +24,7 @@ private:
     TimerfdManager&operator=(const TimerfdManager&other) = delete;
 
     int fd_;
+    uint64_t interval_;
 public:
     // mini_interval is by ms
     TimerfdManager(uint64_t mini_interval = INTERVAL){
@@ -31,6 +32,7 @@ public:
         if(fd_<0)
             throw std::runtime_error("cannot start timer fd");
 
+        interval_ = mini_interval;
         struct itimerspec timer;
         timer.it_interval.tv_sec = 0;
         timer.it_interval.tv_nsec = mini_interval*1000000;
@@ -49,6 +51,7 @@ public:
         close(fd_);
     }
     int GetFd() const { return fd_; }
+    uint64_t GetInterval() const{ return interval_;}
 };
 
 

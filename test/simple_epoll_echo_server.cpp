@@ -14,7 +14,7 @@
 #include "../src/util/SocketfdManager.h"
 
 constexpr int MAX_EVENTS = 10;
-constexpr int BUFFER_SIZE = 1024;
+constexpr int BUFFER_SIZE = 1;
 constexpr int PORT = 12345;
 
 int main() {
@@ -38,6 +38,7 @@ int main() {
                 socklen_t addrLen = sizeof(clientAddr);
                 ssize_t bytesRead = recvfrom(sockfd, buffer, BUFFER_SIZE, 0,
                                              reinterpret_cast<sockaddr*>(&clientAddr), &addrLen);
+                std::cout << "read "<< bytesRead <<" byte(s)" << std::endl;
                 if (bytesRead < 0) {
                     std::cerr << "Failed to receive data." << std::endl;
                     return ;

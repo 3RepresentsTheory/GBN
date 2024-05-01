@@ -6,6 +6,7 @@
 
 void GBNSender::SendAck(uint16_t ackno) {
     sender_queue_.emplace_back(GBNPDU(ackno));
+    notify_nwrite_(1);
 }
 
 void GBNSender::TimeElasped(uint64_t ms_ticked) {
@@ -21,12 +22,14 @@ void GBNSender::TimeElasped(uint64_t ms_ticked) {
                     i++;
                 }
             }
+            notify_nwrite_(next_seq_-seq_has_acked_);
         }
     }
 }
 
 void GBNSender::FillWindow() {
     int i = 0;
+    int new_num = 0;
     int skip = next_seq_-seq_has_acked_;
     for(auto &pkg: sender_stream_.GetFrames()){
         if(next_seq_-seq_has_acked_>=win_size_)
@@ -46,7 +49,9 @@ void GBNSender::FillWindow() {
 
         sender_queue_.push_back(pkg);
         next_seq_++;
+        new_num ++;
     }
+    notify_nwrite_(new_num);
 
     // stop timer if no more data to fill up window
     if(

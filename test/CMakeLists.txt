@@ -29,3 +29,18 @@ add_executable( GBNSender_test
     ../src/GBNByteStream.cpp
     ../src/GBNPDU.cpp
 )
+
+add_executable( GBNConnection_test
+    GBNConnection_test.cpp
+    GBNSenderTestHarness.cpp
+    ../src/GBNConnection.cpp
+    ../src/GBNSender.cpp
+    ../src/GBNByteStream.cpp
+    ../src/GBNPDU.cpp
+)
+
+
+add_executable( GBNSocket_test
+    ../src/GBNSocket.cpp
+    ../src/GBNEventLoop.cpp
+)

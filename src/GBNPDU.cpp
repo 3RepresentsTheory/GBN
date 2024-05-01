@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <cstring>
 #include "GBNPDU.h"
 
 static void insert_u16(uint16_t n,std::string&frame){
@@ -25,11 +26,25 @@ static uint16_t retrieve_u16(const std::string&frame){
     }
     return ret;
 }
+
+static uint16_t retrieve_16(const char*buf){
+    uint16_t ret = 0;
+    ret += (uint8_t)buf[0];
+    ret += ((uint8_t)buf[1])<<8;
+    return ret;
+}
+
 static uint8_t retrieve_u8(const std::string&frame){
     uint8_t ret = 0;
     if(frame.size()>1){
         ret += (uint8_t)frame[0];
     }
+    return ret;
+}
+
+static uint8_t retrieve_u8(const char*buf){
+    uint8_t ret = 0;
+    ret += (uint8_t)buf[0];
     return ret;
 }
 
@@ -79,6 +94,26 @@ void GBNPDU::Deserialize(std::string &bytestream) {
     data_   = bytestream.substr(0,length_);
 }
 
+void GBNPDU::Deserialize(const char *buf,size_t n) {
+    if(
+        !CheckSumCal(buf,n)||
+        strncmp(buf,MAGIC_NUM,sizeof(MAGIC_NUM)-1)
+    ){
+        char *p = const_cast<char *>(buf);
+        p+=sizeof(MAGIC_NUM)-1;
+        finf_ = retrieve_u8(p);
+        p+=1;
+        ackf_ = retrieve_u8(p);
+        p+=1;
+        num_  = retrieve_u16(p);
+        p+=2;
+        length_= retrieve_u16(p);
+        p+=2;
+        data_ = std::string(p,length_);
+    }
+}
+
+
 
 GBNPDU::GBNPDU(GBNPDU::uint16 acknum) {
     length_ = 0;
@@ -101,9 +136,9 @@ GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) 
 }
 
 
-GBNPDU::GBNPDU(std::string &&frame) {
-    Deserialize(frame);
-}
+GBNPDU::GBNPDU(std::string &&frame) { Deserialize(frame); }
+
+GBNPDU::GBNPDU(const char *buf,size_t n) { Deserialize(buf,n); }
 
 
 
@@ -155,6 +190,14 @@ bool GBNPDU::CheckSumCal(const std::string& data) {
     return crc==0;
 }
 
+bool GBNPDU::CheckSumCal(const char *buf, size_t n) {
+    uint16 crc = crc16_ccitt_init();
+    for(int i = 0;i<n;i++){
+        crc = crc16_ccitt_update(buf[i],crc);
+    }
+    return crc==0;
+}
+
 void GBNPDU::HexDump(const std::string &bytestream) {
     static const char* hex = "0123456789ABCDEF";
     int i = 0;
@@ -167,6 +210,9 @@ void GBNPDU::HexDump(const std::string &bytestream) {
     }
     if(i%16!=0) printf("\n");
 }
+
+
+
 
 
 

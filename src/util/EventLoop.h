@@ -18,6 +18,7 @@ private:
     static constexpr int MAX_EVENTS = 10;
     int epollfd_;
     int max_events_;
+    volatile int is_running_ = true;
     std::vector<Event> events_;
     epoll_event ready_events_[];
 
@@ -49,7 +50,7 @@ public:
     }
 
     void Loop(){
-        while(true){
+        while(is_running_){
             // try to retrieve available event
             int nevents = epoll_wait(epollfd_,ready_events_,max_events_,-1);
             if(nevents<0)
@@ -62,6 +63,8 @@ public:
             }
         }
     }
+
+    void StopLoop(){is_running_ = false;}
 
 };
 

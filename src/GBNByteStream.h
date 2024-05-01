@@ -30,6 +30,7 @@ public:
 
     bool   IsEofed(){return iseof_;}
     bool   IsEnded(){return iseof_ && pdu_frames_.empty();}
+    bool   IsEmpty(){return pdu_frames_.empty();}
 
     // return the pdu_frames for retransmission
     std::deque<GBNPDU>&GetFrames(){return pdu_frames_;};

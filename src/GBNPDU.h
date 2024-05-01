@@ -32,6 +32,8 @@ static const char MAGIC_NUM[] = "GOBACKTON1";
 class GBNPDU{
     friend class GBNByteStream;
     friend class GBNSender;
+    friend class GBNReceiver;
+    friend class GBNConnection;
 
 //    static const unsigned MAX_PKG_SIZE_ = 4096;
     static const unsigned MAX_PKG_SIZE_ = 16+2+16;
@@ -63,16 +65,21 @@ public:
     GBNPDU(uint16 acknum);
     // generate data package
     GBNPDU(uint16 seqnum,const std::string&data,bool fin);
+
     // Deserialize construct
     GBNPDU(std::string &&frame);
+    // Deserialize char* ver
+    GBNPDU(const char* buf,size_t n);
 
     std::string Serialize ()const;
     void Deserialize(std::string& bytestream);
+    void Deserialize(const char* buf,size_t n);
 
     bool IsFormated(){return !malformed_;};
 
 
     static bool   CheckSumCal(const std::string& data);
+    static bool   CheckSumCal(const char*buf, size_t n);
     static uint16 CalCheckSum(const std::string& data);
     static void HexDump(const std::string&bytestream);
 

@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <functional>
 #include "GBNByteStream.h"
 
 
@@ -45,10 +46,16 @@ public:
 
 };
 
+using tcallback = std::function<void(int)>;
+
+static void DefaultCallBack(int){}
+
 class GBNSender{
 private:
     static const uint16_t DEFAULT_WIN_  = 10;
     static const uint16_t DEFAULT_TIME_OUT_ = 500;
+
+    tcallback notify_nwrite_;
 
     ByteStream sender_stream_;
     std::deque<GBNPDU> sender_queue_;
@@ -62,9 +69,10 @@ public:
     GBNSender(
             uint16_t win_size = DEFAULT_WIN_,
             uint16_t time_out = DEFAULT_TIME_OUT_
-    ):win_size_(win_size), alarm_(time_out){
+    ): win_size_(win_size), alarm_(time_out){
         if(win_size==0)
             throw std::runtime_error("GBNSender cannot use zero window");
+        notify_nwrite_ = DefaultCallBack;
     }
     void SendAck(uint16_t ackno);
 
@@ -77,8 +85,9 @@ public:
      *  user write:  user write to the socket, then try its best to fill up window;
      */
     void FillWindow();
-
     void AckReceived(uint16_t ackno);
+
+    void RegisterCallBack(tcallback tcb){notify_nwrite_ = tcb;}
 
     std::deque<GBNPDU>&GetSenderQueue(){return sender_queue_;};
     ByteStream &GetStream(){return sender_stream_;};
