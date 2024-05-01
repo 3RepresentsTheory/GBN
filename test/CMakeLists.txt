@@ -42,5 +42,23 @@ add_executable( GBNConnection_test
 
 add_executable( GBNSocket_test
     ../src/GBNSocket.cpp
-    ../src/GBNEventLoop.cpp
+)
+
+add_executable( GBNSocketClient_test
+    GBNSocketClient_test.cpp
+    ../src/GBNSocket.cpp
+    ../src/GBNConnection.cpp
+    ../src/GBNSender.cpp
+    ../src/GBNByteStream.cpp
+    ../src/GBNPDU.cpp
+)
+
+
+add_executable( GBNSocketServer_test
+        GBNSocketServer_test.cpp
+        ../src/GBNSocket.cpp
+        ../src/GBNConnection.cpp
+        ../src/GBNSender.cpp
+        ../src/GBNByteStream.cpp
+        ../src/GBNPDU.cpp
 )

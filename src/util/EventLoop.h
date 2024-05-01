@@ -10,6 +10,7 @@
 #include <csignal>
 #include <set>
 #include <vector>
+#include <cstring>
 #include "Event.h"
 
 
@@ -53,8 +54,14 @@ public:
         while(is_running_){
             // try to retrieve available event
             int nevents = epoll_wait(epollfd_,ready_events_,max_events_,-1);
-            if(nevents<0)
-                throw std::runtime_error("failed to wait event");
+            if(nevents<0){
+                char *estr = strerror(errno);
+                throw std::runtime_error(
+                        "failed to wait event with error: "+
+                        std::string(estr,strlen(estr))
+                );
+
+            }
 
             // find ready event and execute callback
             for (int i = 0; i < nevents; ++i) {

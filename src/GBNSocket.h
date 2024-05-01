@@ -50,7 +50,7 @@ public:
             const std::string& peer_ip
     ): GBNSocket(local_port){
         peer_addr_.sin_family = AF_INET;
-        peer_addr_.sin_port   = peer_port;
+        peer_addr_.sin_port   = htons(peer_port);
         if(inet_pton(AF_INET,peer_ip.c_str(),&(peer_addr_.sin_addr))<0)
             throw std::runtime_error("invalid peer address");
     }
@@ -60,6 +60,7 @@ public:
     size_t Write(const std::string & str);
     size_t Write(const char*buf, size_t n);
     size_t Read(char*buf ,size_t n);
+    std::string Read(size_t n);
 
 
 };

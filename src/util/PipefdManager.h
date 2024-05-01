@@ -21,6 +21,7 @@ public:
     int GetReadfd(){ return pipefd[0]; }
     int GetWritefd(){return pipefd[1]; }
 
+    // lack of closing
 };
 
 #endif //GOBACKN_PIPEFDMANAGER_H

@@ -41,7 +41,6 @@ public:
 
         if (timerfd_settime(fd_, 0, &timer, nullptr) == -1){
             setbuf(stdout,0);
-            printf("%s\n", strerror(errno));
             throw std::runtime_error("cannot set timer fd");
         }
     }

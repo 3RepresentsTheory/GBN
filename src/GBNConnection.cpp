@@ -5,10 +5,18 @@
 #include "GBNConnection.h"
 
 void GBNConnection::PkgReceived(const GBNPDU &moved_pkg) {
+    //TODO: need check malformed here!!
+    if(moved_pkg.malformed_)
+        return;
+
     if(moved_pkg.ackf_)
         sender_.AckReceived(moved_pkg.GetNum());
-    else
+    else{
         receiver_.PkgReceived(moved_pkg);
+        int ackno = receiver_.GetRecvNum()-1;
+        if(ackno>=0)
+            sender_.SendAck(ackno);
+    }
 }
 
 void GBNConnection::EndInput() {

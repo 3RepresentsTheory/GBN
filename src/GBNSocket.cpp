@@ -2,6 +2,7 @@
 // Created by no3core on 2024/4/17.
 //
 
+#include <iostream>
 #include "GBNSocket.h"
 
 
@@ -34,7 +35,7 @@ GBNSocket::GBNSocket(
     int timerfd= tfd_.GetFd();
     uint64_t interval = tfd_.GetInterval();
     eventloop_.RegisterEvent(
-        sockfd,
+        timerfd,
         EPOLLIN|EPOLLET,
         [timerfd,interval,this](){
             uint64_t expiration = 0;
@@ -66,9 +67,6 @@ GBNSocket::~GBNSocket() {
     eventthread_.join();
 }
 
-
-
-
 constexpr int BUFFER_SIZE = 65507 ; // max udp package
 void GBNSocket::FrameReceived(int socketfd) {
     std::unique_lock<std::mutex> lock(read_mtx_);
@@ -86,7 +84,12 @@ void GBNSocket::FrameReceived(int socketfd) {
                 &addrLen
             );
 
-    connection_.PkgReceived(GBNPDU(buffer,bytesRead));
+    auto && temp_pkg =GBNPDU(buffer,bytesRead);
+    if(!temp_pkg.IsFormated()){
+        std::cout << "detect unformated package" << std::endl;
+        return;
+    }
+    connection_.PkgReceived(temp_pkg);
 
     // notify the read is 'perhaps' available now, for it might be ack package
     // (not nice design here)
@@ -116,8 +119,12 @@ void GBNSocket::FrameSent(int eventfd) {
                 reinterpret_cast<sockaddr*>(&peer_addr_),
                 sizeof(peer_addr_)
         );
-        if(bytesSent<0)
-            throw std::runtime_error("GBNSocket: failed to sent package");
+        if(bytesSent<0){
+            char *p = strerror(errno);
+            std::cout << peer_addr_.sin_port << std::endl;
+            std::cout << peer_addr_.sin_addr.s_addr << std::endl;
+            throw std::runtime_error("GBNSocket: failed to sent package" + std::string(p,strlen(p)));
+        }
         sentq.pop_front();
     }
 }
@@ -141,6 +148,15 @@ size_t GBNSocket::Write(const char *buf, size_t n) {
 
 size_t GBNSocket::Write(const std::string &str) {
     return Write(str.c_str(),str.size());
+}
+
+std::string GBNSocket::Read(size_t n) {
+    std::unique_lock<std::mutex> lock(read_mtx_);
+    while(connection_.GetRecvStream().IsEmpty())
+        read_cv_.wait(lock);
+
+    auto retstring = connection_.GetRecvStream().Read(n);
+    return retstring;
 }
 
 

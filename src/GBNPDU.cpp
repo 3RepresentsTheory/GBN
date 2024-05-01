@@ -27,7 +27,7 @@ static uint16_t retrieve_u16(const std::string&frame){
     return ret;
 }
 
-static uint16_t retrieve_16(const char*buf){
+static uint16_t retrieve_u16(const char*buf){
     uint16_t ret = 0;
     ret += (uint8_t)buf[0];
     ret += ((uint8_t)buf[1])<<8;
@@ -99,18 +99,20 @@ void GBNPDU::Deserialize(const char *buf,size_t n) {
         !CheckSumCal(buf,n)||
         strncmp(buf,MAGIC_NUM,sizeof(MAGIC_NUM)-1)
     ){
-        char *p = const_cast<char *>(buf);
-        p+=sizeof(MAGIC_NUM)-1;
-        finf_ = retrieve_u8(p);
-        p+=1;
-        ackf_ = retrieve_u8(p);
-        p+=1;
-        num_  = retrieve_u16(p);
-        p+=2;
-        length_= retrieve_u16(p);
-        p+=2;
-        data_ = std::string(p,length_);
+        malformed_ = true;
+        return;
     }
+    char *p = const_cast<char *>(buf);
+    p+=sizeof(MAGIC_NUM)-1;
+    finf_ = retrieve_u8(p);
+    p+=1;
+    ackf_ = retrieve_u8(p);
+    p+=1;
+    num_  = retrieve_u16(p);
+    p+=2;
+    length_= retrieve_u16(p);
+    p+=2;
+    data_ = std::string(p,length_);
 }
 
 
