@@ -13,14 +13,15 @@ void GBNSender::TimeElasped(uint64_t ms_ticked) {
     if(alarm_.IsCounting()){
         alarm_.TimeElasp(ms_ticked);
         if(alarm_.IsTimeOut()){
+            fprintf(stderr,"timeout triggered, retransmit the window\n");
             // get retransmission
             alarm_.StartResetAlarm();
             int i = seq_has_acked_;
             for(auto &pkg: sender_stream_.GetFrames()) {
-                if(i!=next_seq_){
-                    sender_queue_.push_back(pkg);
-                    i++;
-                }
+                if(i==next_seq_)
+                    break;
+                sender_queue_.push_back(pkg);
+                i++;
             }
             notify_nwrite_(next_seq_-seq_has_acked_);
         }
@@ -32,9 +33,11 @@ void GBNSender::FillWindow() {
     int new_num = 0;
     int skip = next_seq_-seq_has_acked_;
     for(auto &pkg: sender_stream_.GetFrames()){
+        // window is full ,not fill up window
         if(next_seq_-seq_has_acked_>=win_size_)
             break;
 
+        // fill window at back
         if(i<skip){
             i++;
             continue;

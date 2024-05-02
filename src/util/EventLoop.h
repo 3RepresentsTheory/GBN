@@ -21,7 +21,7 @@ private:
     int max_events_;
     volatile int is_running_ = true;
     std::vector<Event> events_;
-    epoll_event ready_events_[];
+    epoll_event ready_events_[MAX_EVENTS];
 
 public:
     EventLoop(int max_event = MAX_EVENTS){

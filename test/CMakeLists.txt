@@ -1,9 +1,11 @@
+
 add_executable( GBNPDU_test
     GBNPDU_test.cpp
     ../src/GBNReceiver.cpp
     ../src/GBNSender.cpp
     ../src/GBNSocket.cpp
     ../src/GBNPDU.cpp
+    ../src/GBNByteStream.cpp
 )
 
 add_executable( GBNPDU_epoll_test
@@ -44,6 +46,8 @@ add_executable( GBNSocket_test
     ../src/GBNSocket.cpp
 )
 
+
+
 add_executable( GBNSocketClient_test
     GBNSocketClient_test.cpp
     ../src/GBNSocket.cpp
@@ -52,6 +56,30 @@ add_executable( GBNSocketClient_test
     ../src/GBNByteStream.cpp
     ../src/GBNPDU.cpp
 )
+
+add_executable( GBNFileReceiver_test
+        GBNFileReceiver_test.cpp
+        ../src/GBNSocket.cpp
+        ../src/GBNConnection.cpp
+        ../src/GBNSender.cpp
+        ../src/GBNByteStream.cpp
+        ../src/GBNPDU.cpp
+)
+add_executable( GBNFileSender_test
+        GBNFileSender_test.cpp
+        ../src/GBNSocket.cpp
+        ../src/GBNConnection.cpp
+        ../src/GBNSender.cpp
+        ../src/GBNByteStream.cpp
+        ../src/GBNPDU.cpp
+)
+
+#target_include_directories(
+#        GBNSocketClient_test
+#        PRIVATE
+#        spdlog::spdlog_header_only
+#)
+
 
 
 add_executable( GBNSocketServer_test
@@ -62,3 +90,10 @@ add_executable( GBNSocketServer_test
         ../src/GBNByteStream.cpp
         ../src/GBNPDU.cpp
 )
+
+#target_include_directories(
+#        GBNSocketServer_test
+#        PRIVATE
+#        spdlog::spdlog_header_only
+#)
+

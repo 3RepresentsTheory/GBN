@@ -38,3 +38,7 @@ size_t GBNConnection::Write(const std::string &str) {
 void GBNConnection::TimeElapsed(uint64_t ms) {
     sender_.TimeElasped(ms);
 }
+
+size_t GBNConnection::Read(char *buf, size_t n) {
+    return receiver_.GetStream().Read(buf,n);
+}

@@ -12,14 +12,16 @@ void EchoServer(uint16_t port) {
         char buffer[1024];
         size_t bytesRead = server.Read(buffer, sizeof(buffer));
         buffer[bytesRead]='\0';
-        printf("server gets: %zu bytes: %s\n",bytesRead,buffer);
+        fprintf(stderr,"server gets: %zu bytes to(%p) %s\n",bytesRead,buffer,buffer);
         if (bytesRead > 0) {
-            server.Write(buffer, bytesRead);
+            auto bytesWrite = server.Write(buffer, bytesRead);
+            fprintf(stderr,"server writes: %zu bytes\n",bytesWrite);
         }
     }
 }
 
 int main() {
+    setbuf(stdout,0);
     uint16_t port = 1234;
     EchoServer(port);
 

@@ -3,16 +3,32 @@
 //
 
 #include "GBNByteStream.h"
+static const char*n2hex = "0123456789ABCDEF";
 
 size_t ByteStream::Read(char *buffer, size_t n) {
     if(n<0) return -1;
 
     char* p = buffer;
     while(!pdu_frames_.empty()&&n!=0){
+
         auto &pkg = pdu_frames_.front();
+        fprintf(stderr,
+                "picking frame(%p) with PDU data: num %d, len %zu, and data: \n",
+                &pkg,
+                pkg.GetNum(),
+                pkg.GetLen()
+        );
+        for (int i = 0; i < pkg.GetLen(); ++i) {
+            unsigned char x = pkg.GetData()[i];
+            fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
+            if(i%2==1) fprintf(stderr," ");
+        }
+        fprintf(stderr,"\n");
+
         size_t avail_len   = pkg.GetLen()-has_readn_;
         size_t actual_len  = std::min(avail_len,n);
         pkg.GetData().copy(p,actual_len,has_readn_);
+
         if(n>=avail_len){
             pdu_frames_.pop_front();
             has_readn_ = 0;
@@ -44,6 +60,7 @@ size_t ByteStream::Write(const char *buffer, size_t n) {
     while(n){
         size_t availabel_size = std::min(n,largest_pkg_size);
         pdu_frames_.emplace_back(0,std::string(p,availabel_size), false);
+//        fprintf(stderr,"pushing a frame(%p) size at %p %zu with : %s\n",&pdu_frames_.back(),p,availabel_size,pdu_frames_.back().GetData().c_str());
         p+=availabel_size;
         n-=availabel_size;
     }

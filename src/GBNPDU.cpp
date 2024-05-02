@@ -92,6 +92,7 @@ void GBNPDU::Deserialize(std::string &bytestream) {
     length_ = retrieve_u16(bytestream);
     bytestream.erase(0,2);
     data_   = bytestream.substr(0,length_);
+    malformed_ = false;
 }
 
 void GBNPDU::Deserialize(const char *buf,size_t n) {
@@ -113,6 +114,7 @@ void GBNPDU::Deserialize(const char *buf,size_t n) {
     length_= retrieve_u16(p);
     p+=2;
     data_ = std::string(p,length_);
+    malformed_ = false;
 }
 
 
@@ -122,6 +124,7 @@ GBNPDU::GBNPDU(GBNPDU::uint16 acknum) {
     ackf_   = true;
     num_    = acknum;
     checksum_ = 0;
+    malformed_ = false;
 }
 
 GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) {
@@ -135,6 +138,7 @@ GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) 
     num_    = seqnum;
     ackf_   = false;
     checksum_ = 0;
+    malformed_ = false;
 }
 
 

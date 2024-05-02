@@ -31,11 +31,15 @@ public:
     void EndInput();
     void TimeElapsed(uint64_t ms);
 
+    size_t Read(char* buf,size_t n);
+
     size_t Write(const char* buf, size_t n);
     size_t Write(const std::string & str);
 
     std::deque<GBNPDU> &GetWaitToSent(){return sender_.GetSenderQueue();}
     ByteStream& GetRecvStream(){return receiver_.GetStream();}
+
+    bool IsSenderFull(){return sender_.IsStreamFull();}
 
     GBNSender   sender_;
 };

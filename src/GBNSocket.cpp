@@ -25,7 +25,7 @@ GBNSocket::GBNSocket(
 
     // event register:
 
-    // basic listening event
+    // basic udp listening event
     int sockfd = sfd_.GetFd();
     eventloop_.RegisterEvent(
         sockfd,
@@ -46,7 +46,7 @@ GBNSocket::GBNSocket(
         }
     );
 
-    // write event
+    // udp socket write event
     int pipefd_read = pfd_.GetReadfd();
     int pipefd_write= pfd_.GetWritefd();
     connection_.RegisterCallBack(
@@ -59,6 +59,70 @@ GBNSocket::GBNSocket(
     );
 
 
+    // user socket read event
+    int rrequest_listen_fd = rrequest_.GetReadfd();
+    int rreply_fd = rreply_.GetWritefd();
+    eventloop_.RegisterEvent(
+        rrequest_listen_fd,
+        EPOLLIN,
+        [rrequest_listen_fd,rreply_fd,this]{
+            char* usr_buf; size_t n,bytes_read=0;
+            read(rrequest_listen_fd,&usr_buf,sizeof(usr_buf));
+            read(rrequest_listen_fd,&n,sizeof(n));
+
+            // only work when the stream isn't empty
+            if(!connection_.GetRecvStream().IsEmpty()){
+                bytes_read = connection_.Read(usr_buf,n);
+                write(rreply_fd,&bytes_read,sizeof(bytes_read));
+                // notify the socket reader
+                {
+                    std::unique_lock<std::mutex> lk(read_mt_);
+                    rstate_ = PASS;
+                    read_cv_.notify_one();
+                }
+            }else{
+                {
+                    std::unique_lock<std::mutex> lk(write_mt_);
+                    rstate_ = WCHGE;
+                }
+            }
+        }
+    );
+
+    // user socket write event
+    int wrequest_listen_fd = wrequest_.GetReadfd();
+    int wreply_fd = wreply_.GetWritefd();
+    eventloop_.RegisterEvent(
+        wrequest_listen_fd,
+        EPOLLIN,
+        [wrequest_listen_fd,wreply_fd,this]{
+            char* usr_buf; size_t n,bytes_write=0;
+            read(wrequest_listen_fd,&usr_buf,sizeof(usr_buf));
+            read(wrequest_listen_fd,&n,sizeof(n));
+
+            fprintf(stderr,"server response write event at %p with %zu ",usr_buf,n);
+
+            // slightly imprecise here, when its not full, the write may exceed the buf length
+            if(!connection_.IsSenderFull()){
+                fprintf(stderr,"with success\n");
+                bytes_write = connection_.Write(usr_buf,n);
+                write(wreply_fd,&bytes_write,sizeof(bytes_write));
+                {
+                    std::unique_lock<std::mutex> lk(write_mt_);
+                    wstate_ = PASS;
+                    write_cv_.notify_one();
+                }
+            }else{
+                fprintf(stderr,"but failed, give up\n");
+                {
+                    std::unique_lock<std::mutex> lk(write_mt_);
+                    wstate_ = WCHGE;
+                }
+            }
+        }
+    );
+
+
     // launch the thread for event loop:
     eventthread_ = std::thread(&EventLoop::Loop,&eventloop_);
 
@@ -68,10 +132,10 @@ GBNSocket::~GBNSocket() {
     eventloop_.StopLoop();
     eventthread_.join();
 }
+static const char*n2hex = "0123456789ABCDEF";
 
 constexpr int BUFFER_SIZE = 65507 ; // max udp package
 void GBNSocket::FrameReceived(int socketfd) {
-    std::unique_lock<std::mutex> lock(read_mtx_);
 
     char buffer[BUFFER_SIZE];
     sockaddr_in clientAddr{};
@@ -86,20 +150,67 @@ void GBNSocket::FrameReceived(int socketfd) {
                 &addrLen
             );
 
+    fprintf(stderr,
+            "frame received! with raw data: \n"
+    );
+    for (int j = 0; j < bytesRead; ++j) {
+        unsigned char x = buffer[j];
+        fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
+        if(j % 2 == 1) fprintf(stderr, " ");
+    }
+    fprintf(stderr,"\n");
+
     auto && temp_pkg =GBNPDU(buffer,bytesRead);
     if(!temp_pkg.IsFormated()){
         std::cout << "detect unformated package" << std::endl;
         return;
     }
+
+    if(temp_pkg.ackf_){
+        fprintf(stderr,
+                "frame received! with PDU ack: num %d\n\n",
+                temp_pkg.GetNum()
+        );
+    }else{
+        fprintf(stderr,
+                "frame received! with PDU data: num %d, len %zu, and data: \n",
+                temp_pkg.GetNum(),
+                temp_pkg.GetLen()
+        );
+
+        for (int j = 0; j < temp_pkg.GetLen(); ++j) {
+            unsigned char x = temp_pkg.GetData()[j];
+            fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
+            if(j % 2 == 1) fprintf(stderr, " ");
+        }
+        fprintf(stderr,"\n\n");
+    }
+
     connection_.PkgReceived(temp_pkg);
 
-    // notify the read is 'perhaps' available now, for it might be ack package
-    // (not nice design here)
-    read_cv_.notify_one();
+    // wake up possible socket reader
+    // notify the socket reader
+    if(!connection_.GetRecvStream().IsEmpty())
+    {
+        std::unique_lock<std::mutex> lk(read_mt_);
+        if(rstate_==WCHGE){
+            rstate_ = RETRY;
+            read_cv_.notify_one();
+        }
+    }
+
+    if(!connection_.IsSenderFull()){
+        std::unique_lock<std::mutex> lk(write_mt_);
+        if(wstate_==WCHGE){
+            wstate_ = RETRY;
+            write_cv_.notify_one();
+        }
+    }
 
     if(peer_addr_.sin_port==0)
         peer_addr_ = clientAddr;
 }
+
 
 void GBNSocket::FrameSent(int eventfd) {
     if(peer_addr_.sin_port==0)
@@ -108,10 +219,35 @@ void GBNSocket::FrameSent(int eventfd) {
     // temp no checking
     read(eventfd,&sentnum,sizeof(sentnum));
 
+//    fprintf(stderr,"frame sent, there is %d pkg wait to sent\n",sentnum);
+
     int sockfd = sfd_.GetFd();
     auto & sentq = connection_.GetWaitToSent();
     for (int i = 0; i < sentnum && !sentq.empty(); ++i) {
         auto &pkg = sentq.front();
+
+        if(pkg.ackf_){
+            fprintf(stderr,
+                    "frame sent! with PDU ack: num %d\n"
+                    "to the host: %s:%d\n\n",
+                    pkg.GetNum(),
+                    inet_ntoa(peer_addr_.sin_addr),
+                    ntohs(peer_addr_.sin_port)
+            );
+        }else{
+            fprintf(stderr,
+                    "frame sent! with PDU data: num %d, len %zu, and data: ",
+                    pkg.GetNum(),
+                    pkg.GetLen()
+            );
+            for (int j = 0; j < pkg.GetLen(); ++j) {
+                unsigned char x = pkg.GetData()[j];
+                fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
+                if(j % 2 == 1) fprintf(stderr, " ");
+            }
+            fprintf(stderr,"\n\n");
+        }
+//
         auto &&serial = pkg.Serialize();
         ssize_t bytesSent = sendto(
                 sockfd,
@@ -133,19 +269,56 @@ void GBNSocket::FrameSent(int eventfd) {
 
 size_t GBNSocket::Read(char *buf, size_t n) {
     // TODO: need support handling write to ended pipe (fin)
-    std::unique_lock<std::mutex> lock(read_mtx_);
-    while(connection_.GetRecvStream().IsEmpty())
-        read_cv_.wait(lock);
 
-    auto bytes_reads = connection_.GetRecvStream().Read(buf,n);
-    return bytes_reads;
+    int rrequest_fd = rrequest_.GetWritefd();
+    int rreply_fd   = rreply_.GetReadfd();
+    size_t bytes_read;
+
+    bool need_retry = false;
+    do{
+        write(rrequest_fd,&buf,sizeof(buf));
+        write(rrequest_fd,&n,sizeof(n));
+
+        // wait for data ready
+        {
+            std::unique_lock<std::mutex> lk(read_mt_);
+            read_cv_.wait(lk,[this]{return rstate_==PASS||rstate_==RETRY;});
+            need_retry = (rstate_==RETRY);
+            rstate_ = READY;
+        }
+    }while(need_retry);
+
+    read(rreply_fd,&bytes_read,sizeof(bytes_read));
+
+    return bytes_read;
 }
 
 size_t GBNSocket::Write(const char *buf, size_t n) {
     // TODO: need support handling write to ended pipe (fin)
 
-    auto bytes_writes = connection_.Write(buf,n);
-    return bytes_writes;
+    int wrequest_fd = wrequest_.GetWritefd();
+    int wreply_fd   = wreply_.GetReadfd();
+    size_t bytes_write;
+
+    bool need_retry = false;
+    do{
+        write(wrequest_fd,&buf,sizeof(buf));
+        write(wrequest_fd,&n,sizeof(n));
+
+        fprintf(stderr,"user request write event at %p with %zu ",buf,n);
+
+        // wait for write data ready
+        {
+            std::unique_lock<std::mutex> lk(write_mt_);
+            write_cv_.wait(lk,[this]{return wstate_==PASS||wstate_==RETRY;});
+            need_retry = (wstate_==RETRY);
+            wstate_ = READY;
+        }
+    }while(need_retry);
+
+    read(wreply_fd,&bytes_write,sizeof(bytes_write));
+
+    return bytes_write;
 }
 
 size_t GBNSocket::Write(const std::string &str) {
@@ -153,9 +326,6 @@ size_t GBNSocket::Write(const std::string &str) {
 }
 
 std::string GBNSocket::Read(size_t n) {
-    std::unique_lock<std::mutex> lock(read_mtx_);
-    while(connection_.GetRecvStream().IsEmpty())
-        read_cv_.wait(lock);
 
     auto retstring = connection_.GetRecvStream().Read(n);
     return retstring;

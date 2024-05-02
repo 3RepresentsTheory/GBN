@@ -53,7 +53,8 @@ static void DefaultCallBack(int){}
 class GBNSender{
 private:
     static const uint16_t DEFAULT_WIN_  = 10;
-    static const uint16_t DEFAULT_TIME_OUT_ = 500;
+    static const uint16_t DEFAULT_BUF_  = 30;
+    static const uint16_t DEFAULT_TIME_OUT_ = 3000;
 
     tcallback notify_nwrite_;
 
@@ -64,7 +65,7 @@ private:
 
     uint16_t seq_has_acked_ = 0; // seqnum < this has been acked
 
-    uint16_t next_seq_ = 0;
+    uint16_t next_seq_ = 0; // seqnum < this has been sent
 public:
     GBNSender(
             uint16_t win_size = DEFAULT_WIN_,
@@ -88,6 +89,8 @@ public:
     void AckReceived(uint16_t ackno);
 
     void RegisterCallBack(tcallback tcb){notify_nwrite_ = tcb;}
+
+    bool IsStreamFull(){return sender_stream_.GetFrames().size()>=DEFAULT_BUF_;}
 
     std::deque<GBNPDU>&GetSenderQueue(){return sender_queue_;};
     ByteStream &GetStream(){return sender_stream_;};

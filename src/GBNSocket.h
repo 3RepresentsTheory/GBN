@@ -14,6 +14,8 @@
 #include "util/SocketfdManager.h"
 #include "util/PipefdManager.h"
 
+#include <arpa/inet.h>
+
 class GBNSocket{
 
 private:
@@ -22,13 +24,31 @@ private:
     SocketfdManager sfd_;
     PipefdManager   pfd_;
 
+    PipefdManager   rrequest_;
+    PipefdManager   rreply_;
+
+    enum RSTATUS{
+        READY,
+        WREPLY,
+        WCHGE,
+        PASS,
+        RETRY
+    };
+    std::condition_variable read_cv_;
+    std::mutex      read_mt_;
+    int rstate_ = RSTATUS::READY;
+
+    PipefdManager   wrequest_;
+    PipefdManager   wreply_;
+    int wstate_ = RSTATUS::READY;
+
+    std::condition_variable write_cv_;
+    std::mutex      write_mt_;
+
     GBNConnection connection_;
 
     sockaddr_in peer_addr_;
     uint16_t    local_port_;
-
-    std::mutex     read_mtx_;
-    std::condition_variable read_cv_;
 
     std::thread     eventthread_;
     EventLoop       eventloop_;

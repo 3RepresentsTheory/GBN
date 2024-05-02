@@ -11,5 +11,10 @@ set(CMAKE_CXX_STANDARD 14)
 #        src/GBNPDU.cpp
 #)
 
+#if(NOT TARGET spdlog)
+#    # Stand-alone build
+#    find_package(spdlog REQUIRED)
+#endif()
+#include_directories(SYSTEM "/mnt/e/programming/c++/gobackn/spdlog/include/spdlog")
 
 add_subdirectory(test)

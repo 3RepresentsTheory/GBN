@@ -34,12 +34,13 @@ class GBNPDU{
     friend class GBNSender;
     friend class GBNReceiver;
     friend class GBNConnection;
+    friend class GBNSocket;
 
 //    static const unsigned MAX_PKG_SIZE_ = 4096;
     static const unsigned MAX_PKG_SIZE_ = 16+2+16;
     using uint16 = uint16_t;
     using uint8  = uint8_t;
-    bool malformed_ = false;
+    bool malformed_;
 
 
     // frame head
