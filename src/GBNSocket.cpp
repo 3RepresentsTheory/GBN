@@ -20,6 +20,8 @@ GBNSocket::GBNSocket(
      */
 
     local_port_= local_port;
+    peer_addr_.sin_port =0;
+    peer_addr_.sin_addr.s_addr=0;
 
     // event register:
 

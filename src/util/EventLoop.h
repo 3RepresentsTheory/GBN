@@ -53,7 +53,10 @@ public:
     void Loop(){
         while(is_running_){
             // try to retrieve available event
-            int nevents = epoll_wait(epollfd_,ready_events_,max_events_,-1);
+            int nevents;
+            do{
+                nevents = epoll_wait(epollfd_,ready_events_,max_events_,-1);
+            } while (nevents<0&&errno==EINTR);
             if(nevents<0){
                 char *estr = strerror(errno);
                 throw std::runtime_error(

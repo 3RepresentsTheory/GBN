@@ -11,6 +11,7 @@ void EchoServer(uint16_t port) {
     while (true) {
         char buffer[1024];
         size_t bytesRead = server.Read(buffer, sizeof(buffer));
+        buffer[bytesRead]='\0';
         printf("server gets: %zu bytes: %s\n",bytesRead,buffer);
         if (bytesRead > 0) {
             server.Write(buffer, bytesRead);
