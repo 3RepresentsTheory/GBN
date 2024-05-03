@@ -9,6 +9,11 @@ void GBNSender::SendAck(uint16_t ackno) {
     notify_nwrite_(1);
 }
 
+void GBNSender::SendFin() {
+    sender_stream_.GetFrames().emplace_back(-1,std::string(), true);
+    FillWindow();
+}
+
 void GBNSender::TimeElasped(uint64_t ms_ticked) {
     if(alarm_.IsCounting()){
         alarm_.TimeElasp(ms_ticked);
@@ -83,4 +88,5 @@ void GBNSender::AckReceived(uint16_t ackno) {
     alarm_.StartResetAlarm();
     FillWindow();
 }
+
 

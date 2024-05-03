@@ -71,7 +71,11 @@ GBNSocket::GBNSocket(
             read(rrequest_listen_fd,&n,sizeof(n));
 
             // only work when the stream isn't empty
-            if(!connection_.GetRecvStream().IsEmpty()){
+
+            if(
+                !connection_.GetRecvStream().IsEmpty() ||
+                connection_.GetRecvStream().IsEmpty() && connection_.IsPeerEofed() // should return zero below
+            ){
                 bytes_read = connection_.Read(usr_buf,n);
                 write(rreply_fd,&bytes_read,sizeof(bytes_read));
                 // notify the socket reader
@@ -105,6 +109,8 @@ GBNSocket::GBNSocket(
             // slightly imprecise here, when its not full, the write may exceed the buf length
             if(!connection_.IsSenderFull()){
                 fprintf(stderr,"with success\n");
+                if(connection_.IsSelfEofed())
+                    throw std::runtime_error("write to closed pipe");
                 bytes_write = connection_.Write(usr_buf,n);
                 write(wreply_fd,&bytes_write,sizeof(bytes_write));
                 {
@@ -122,6 +128,23 @@ GBNSocket::GBNSocket(
         }
     );
 
+    // closing event
+
+    int close_lisen = closefd_.GetReadfd();
+    eventloop_.RegisterEvent(
+        close_lisen,
+        EPOLLIN,
+        [this,close_lisen]{
+            if(!connection_.IsSelfEofed())
+                connection_.EndInput();
+            if(connection_.IsEnded()){
+                int pseudo;
+                read(close_lisen,&pseudo,sizeof(pseudo));
+                eventloop_.StopLoop();
+            }
+            // else not consume the pipe, make it poll the ended state
+        }
+    );
 
     // launch the thread for event loop:
     eventthread_ = std::thread(&EventLoop::Loop,&eventloop_);
@@ -129,7 +152,7 @@ GBNSocket::GBNSocket(
 }
 
 GBNSocket::~GBNSocket() {
-    eventloop_.StopLoop();
+    Close();
     eventthread_.join();
 }
 static const char*n2hex = "0123456789ABCDEF";
@@ -274,7 +297,7 @@ size_t GBNSocket::Read(char *buf, size_t n) {
     int rreply_fd   = rreply_.GetReadfd();
     size_t bytes_read;
 
-    bool need_retry = false;
+    bool need_retry;
     do{
         write(rrequest_fd,&buf,sizeof(buf));
         write(rrequest_fd,&n,sizeof(n));
@@ -300,7 +323,7 @@ size_t GBNSocket::Write(const char *buf, size_t n) {
     int wreply_fd   = wreply_.GetReadfd();
     size_t bytes_write;
 
-    bool need_retry = false;
+    bool need_retry;
     do{
         write(wrequest_fd,&buf,sizeof(buf));
         write(wrequest_fd,&n,sizeof(n));
@@ -329,6 +352,12 @@ std::string GBNSocket::Read(size_t n) {
 
     auto retstring = connection_.GetRecvStream().Read(n);
     return retstring;
+}
+
+void GBNSocket::Close() {
+    int pseudo = 1;
+    int close_writefd = closefd_.GetWritefd();
+    write(close_writefd,&pseudo,sizeof(int));
 }
 
 

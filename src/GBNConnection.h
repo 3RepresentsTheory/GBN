@@ -40,6 +40,21 @@ public:
     ByteStream& GetRecvStream(){return receiver_.GetStream();}
 
     bool IsSenderFull(){return sender_.IsStreamFull();}
+    bool IsEnded(){
+        // only ended stream when:
+        // the sender set eof, sent fin pkg, and being acked &
+        // the sender buffer is empty
+        // the receiver has being set eof and all consumed by the socket reader
+        return sender_.GetStream().IsEnded() &&
+               sender_.GetSenderQueue().empty()&&
+               receiver_.GetStream().IsEnded()  ;
+    }
+    bool IsPeerEofed(){
+        return receiver_.GetStream().IsEofed();
+    }
+    bool IsSelfEofed(){
+        return sender_.GetStream().IsEofed();
+    }
 
     GBNSender   sender_;
 };

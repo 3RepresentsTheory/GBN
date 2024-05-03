@@ -23,10 +23,9 @@ private:
     TimerfdManager  tfd_;
     SocketfdManager sfd_;
     PipefdManager   pfd_;
+    PipefdManager   closefd_;
 
-    PipefdManager   rrequest_;
-    PipefdManager   rreply_;
-
+    // state machine of socket request read&write
     enum RSTATUS{
         READY,
         WREPLY,
@@ -34,6 +33,9 @@ private:
         PASS,
         RETRY
     };
+    PipefdManager   rrequest_;
+    PipefdManager   rreply_;
+
     std::condition_variable read_cv_;
     std::mutex      read_mt_;
     int rstate_ = RSTATUS::READY;
@@ -81,6 +83,8 @@ public:
     size_t Write(const char*buf, size_t n);
     size_t Read(char*buf ,size_t n);
     std::string Read(size_t n);
+
+    void Close();
 
 
 };

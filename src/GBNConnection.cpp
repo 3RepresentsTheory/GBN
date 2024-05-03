@@ -20,7 +20,9 @@ void GBNConnection::PkgReceived(const GBNPDU &moved_pkg) {
 }
 
 void GBNConnection::EndInput() {
+    // set self pipe write end eof
     sender_.GetStream().SetEof();
+    sender_.SendFin();
 }
 
 size_t GBNConnection::Write(const char *buf, size_t n) {

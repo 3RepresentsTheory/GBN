@@ -12,6 +12,7 @@
 #include <vector>
 #include <cstring>
 #include "Event.h"
+#include "PipefdManager.h"
 
 
 class EventLoop{
@@ -19,9 +20,13 @@ private:
     static constexpr int MAX_EVENTS = 10;
     int epollfd_;
     int max_events_;
+
     volatile int is_running_ = true;
+
     std::vector<Event> events_;
     epoll_event ready_events_[MAX_EVENTS];
+
+    int cur_events_;
 
 public:
     EventLoop(int max_event = MAX_EVENTS){
@@ -65,6 +70,7 @@ public:
                 );
 
             }
+            cur_events_ = nevents;
 
             // find ready event and execute callback
             for (int i = 0; i < nevents; ++i) {
@@ -74,7 +80,10 @@ public:
         }
     }
 
-    void StopLoop(){is_running_ = false;}
+    void StopLoop(){
+        // need handle here
+        is_running_ = false;
+    }
 
 };
 

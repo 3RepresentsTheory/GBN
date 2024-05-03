@@ -55,11 +55,17 @@ std::string ByteStream::Read(size_t n) {
 
 
 size_t ByteStream::Write(const char *buffer, size_t n) {
+    if(IsEofed())
+        throw std::runtime_error("write to an ended pipe");
+
     size_t largest_pkg_size = GBNPDU::LARGEST_DATA_SIZE;
     const char *p = buffer;
     while(n){
         size_t availabel_size = std::min(n,largest_pkg_size);
-        pdu_frames_.emplace_back(0,std::string(p,availabel_size), false);
+
+        // TODO: pretty strange here, if I initialize it with zero, there may be some zero tagged
+        // pdu in the sender queue
+        pdu_frames_.emplace_back(-1,std::string(p,availabel_size), false);
 //        fprintf(stderr,"pushing a frame(%p) size at %p %zu with : %s\n",&pdu_frames_.back(),p,availabel_size,pdu_frames_.back().GetData().c_str());
         p+=availabel_size;
         n-=availabel_size;

@@ -36,7 +36,9 @@ public:
         if(receiver_stream_.IsEofed()) return;
         if(moved_pdu.GetNum() == expected_seq_){
             expected_seq_++;
-            receiver_stream_.PushPDU(moved_pdu);
+            // only push to stream when the pkg contains data
+            if(moved_pdu.GetLen()!=0)
+                receiver_stream_.PushPDU(moved_pdu);
             if(moved_pdu.Fin()) receiver_stream_.SetEof();
         }
     }

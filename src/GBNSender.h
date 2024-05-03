@@ -76,6 +76,7 @@ public:
         notify_nwrite_ = DefaultCallBack;
     }
     void SendAck(uint16_t ackno);
+    void SendFin();
 
     void TimeElasped(uint64_t ms_ticked);
 

@@ -233,4 +233,36 @@ int main(){
         testHarness.ExpectPDU().Num(8);
 
     }
+
+    {
+        // add fin test
+        GBNSender sender(5,100);
+        GBNSenderTestHarness testHarness(sender);
+        sender.GetStream().Write(
+                "\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11""\x11"
+                "\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22""\x22"
+                "\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33""\x33"
+        );
+        sender.SendFin();
+        testHarness.ExpectPDU().Num(0);
+        testHarness.ExpectPDU().Num(1);
+        testHarness.ExpectPDU().Num(2);
+        testHarness.ExpectPDU().Num(3).Fin();
+
+        // need retransmit the fin package
+        sender.TimeElasped(101);
+        testHarness.ExpectPDU().Num(0);
+        testHarness.ExpectPDU().Num(1);
+        testHarness.ExpectPDU().Num(2);
+        testHarness.ExpectPDU().Num(3).Fin();
+
+        sender.AckReceived(2);
+        sender.TimeElasped(101);
+        testHarness.ExpectPDU().Num(3).Fin();
+
+        sender.AckReceived(3);
+        sender.TimeElasped(101);
+
+        testHarness.ExpectNoPDU();
+    }
 }
