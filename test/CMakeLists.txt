@@ -97,3 +97,10 @@ add_executable( GBNSocketServer_test
 #        spdlog::spdlog_header_only
 #)
 
+add_executable(
+        jsontest
+        jsontest.cpp
+)
+
+target_link_libraries(jsontest PRIVATE nlohmann_json::nlohmann_json)
+

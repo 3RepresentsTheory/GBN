@@ -18,3 +18,8 @@ set(CMAKE_CXX_STANDARD 14)
 #include_directories(SYSTEM "/mnt/e/programming/c++/gobackn/spdlog/include/spdlog")
 
 add_subdirectory(test)
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+add_subdirectory(json)
+
+
