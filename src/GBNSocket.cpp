@@ -23,131 +23,7 @@ GBNSocket::GBNSocket(
     peer_addr_.sin_port =0;
     peer_addr_.sin_addr.s_addr=0;
 
-    // event register:
-
-    // basic udp listening event
-    int sockfd = sfd_.GetFd();
-    eventloop_.RegisterEvent(
-        sockfd,
-        EPOLLIN,
-        [sockfd,this](){ FrameReceived(sockfd); }
-    );
-
-    // time trigger event
-    int timerfd= tfd_.GetFd();
-    uint64_t interval = tfd_.GetInterval();
-    eventloop_.RegisterEvent(
-        timerfd,
-        EPOLLIN|EPOLLET,
-        [timerfd,interval,this](){
-            uint64_t expiration = 0;
-            read(timerfd,&expiration,sizeof(expiration));
-            this->connection_.TimeElapsed(expiration*interval);
-        }
-    );
-
-    // udp socket write event
-    int pipefd_read = pfd_.GetReadfd();
-    int pipefd_write= pfd_.GetWritefd();
-    connection_.RegisterCallBack(
-        [pipefd_write](int num){ write(pipefd_write,&num,sizeof(num)); }
-    );
-    eventloop_.RegisterEvent(
-        pipefd_read,
-        EPOLLIN,
-        [pipefd_read,this](){ FrameSent(pipefd_read);}
-    );
-
-
-    // user socket read event
-    int rrequest_listen_fd = rrequest_.GetReadfd();
-    int rreply_fd = rreply_.GetWritefd();
-    eventloop_.RegisterEvent(
-        rrequest_listen_fd,
-        EPOLLIN,
-        [rrequest_listen_fd,rreply_fd,this]{
-            char* usr_buf; size_t n,bytes_read=0;
-            read(rrequest_listen_fd,&usr_buf,sizeof(usr_buf));
-            read(rrequest_listen_fd,&n,sizeof(n));
-
-            // only work when the stream isn't empty
-
-            if(
-                !connection_.GetRecvStream().IsEmpty() ||
-                connection_.GetRecvStream().IsEmpty() && connection_.IsPeerEofed() // should return zero below
-            ){
-                bytes_read = connection_.Read(usr_buf,n);
-                write(rreply_fd,&bytes_read,sizeof(bytes_read));
-                // notify the socket reader
-                {
-                    std::unique_lock<std::mutex> lk(read_mt_);
-                    rstate_ = PASS;
-                    read_cv_.notify_one();
-                }
-            }else{
-                {
-                    std::unique_lock<std::mutex> lk(write_mt_);
-                    rstate_ = WCHGE;
-                }
-            }
-        }
-    );
-
-    // user socket write event
-    int wrequest_listen_fd = wrequest_.GetReadfd();
-    int wreply_fd = wreply_.GetWritefd();
-    eventloop_.RegisterEvent(
-        wrequest_listen_fd,
-        EPOLLIN,
-        [wrequest_listen_fd,wreply_fd,this]{
-            char* usr_buf; size_t n,bytes_write=0;
-            read(wrequest_listen_fd,&usr_buf,sizeof(usr_buf));
-            read(wrequest_listen_fd,&n,sizeof(n));
-
-            fprintf(stderr,"server response write event at %p with %zu ",usr_buf,n);
-
-            // slightly imprecise here, when its not full, the write may exceed the buf length
-            if(!connection_.IsSenderFull()){
-                fprintf(stderr,"with success\n");
-                if(connection_.IsSelfEofed())
-                    throw std::runtime_error("write to closed pipe");
-                bytes_write = connection_.Write(usr_buf,n);
-                write(wreply_fd,&bytes_write,sizeof(bytes_write));
-                {
-                    std::unique_lock<std::mutex> lk(write_mt_);
-                    wstate_ = PASS;
-                    write_cv_.notify_one();
-                }
-            }else{
-                fprintf(stderr,"but failed, give up\n");
-                {
-                    std::unique_lock<std::mutex> lk(write_mt_);
-                    wstate_ = WCHGE;
-                }
-            }
-        }
-    );
-
-    // closing event
-
-    int close_lisen = closefd_.GetReadfd();
-    eventloop_.RegisterEvent(
-        close_lisen,
-        EPOLLIN,
-        [this,close_lisen]{
-            if(!connection_.IsSelfEofed())
-                connection_.EndInput();
-            if(connection_.IsEnded()){
-                int pseudo;
-                read(close_lisen,&pseudo,sizeof(pseudo));
-                eventloop_.StopLoop();
-            }
-            // else not consume the pipe, make it poll the ended state
-        }
-    );
-
-    // launch the thread for event loop:
-    eventthread_ = std::thread(&EventLoop::Loop,&eventloop_);
+    FireEventLoop(0,0);
 
 }
 
@@ -173,41 +49,7 @@ void GBNSocket::FrameReceived(int socketfd) {
                 &addrLen
             );
 
-    fprintf(stderr,
-            "frame received! with raw data: \n"
-    );
-    for (int j = 0; j < bytesRead; ++j) {
-        unsigned char x = buffer[j];
-        fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
-        if(j % 2 == 1) fprintf(stderr, " ");
-    }
-    fprintf(stderr,"\n");
-
     auto && temp_pkg =GBNPDU(buffer,bytesRead);
-    if(!temp_pkg.IsFormated()){
-        std::cout << "detect unformated package" << std::endl;
-        return;
-    }
-
-    if(temp_pkg.ackf_){
-        fprintf(stderr,
-                "frame received! with PDU ack: num %d\n\n",
-                temp_pkg.GetNum()
-        );
-    }else{
-        fprintf(stderr,
-                "frame received! with PDU data: num %d, len %zu, and data: \n",
-                temp_pkg.GetNum(),
-                temp_pkg.GetLen()
-        );
-
-        for (int j = 0; j < temp_pkg.GetLen(); ++j) {
-            unsigned char x = temp_pkg.GetData()[j];
-            fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
-            if(j % 2 == 1) fprintf(stderr, " ");
-        }
-        fprintf(stderr,"\n\n");
-    }
 
     connection_.PkgReceived(temp_pkg);
 
@@ -235,7 +77,19 @@ void GBNSocket::FrameReceived(int socketfd) {
 }
 
 
+void GBNSocket::FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrate) {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+
+    double errorrate_p = errorrate/100.0;
+    double lostrate_p  = lostrate/100.0;
+    std::discrete_distribution<> err_distrib({ 1-errorrate_p, errorrate_p });
+    std::discrete_distribution<> los_distrib({ 1-lostrate_p,  lostrate_p });
+
+}
+
 void GBNSocket::FrameSent(int eventfd) {
+
     if(peer_addr_.sin_port==0)
         throw std::runtime_error("GBNSocket: set peer address first!");
     int sentnum;
@@ -249,29 +103,9 @@ void GBNSocket::FrameSent(int eventfd) {
     for (int i = 0; i < sentnum && !sentq.empty(); ++i) {
         auto &pkg = sentq.front();
 
-        if(pkg.ackf_){
-            fprintf(stderr,
-                    "frame sent! with PDU ack: num %d\n"
-                    "to the host: %s:%d\n\n",
-                    pkg.GetNum(),
-                    inet_ntoa(peer_addr_.sin_addr),
-                    ntohs(peer_addr_.sin_port)
-            );
-        }else{
-            fprintf(stderr,
-                    "frame sent! with PDU data: num %d, len %zu, and data: ",
-                    pkg.GetNum(),
-                    pkg.GetLen()
-            );
-            for (int j = 0; j < pkg.GetLen(); ++j) {
-                unsigned char x = pkg.GetData()[j];
-                fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
-                if(j % 2 == 1) fprintf(stderr, " ");
-            }
-            fprintf(stderr,"\n\n");
-        }
-//
         auto &&serial = pkg.Serialize();
+
+        // sent successfully
         ssize_t bytesSent = sendto(
                 sockfd,
                 serial.c_str(),
@@ -280,18 +114,19 @@ void GBNSocket::FrameSent(int eventfd) {
                 reinterpret_cast<sockaddr*>(&peer_addr_),
                 sizeof(peer_addr_)
         );
+
         if(bytesSent<0){
             char *p = strerror(errno);
             std::cout << peer_addr_.sin_port << std::endl;
             std::cout << peer_addr_.sin_addr.s_addr << std::endl;
             throw std::runtime_error("GBNSocket: failed to sent package" + std::string(p,strlen(p)));
         }
+
         sentq.pop_front();
     }
 }
 
 size_t GBNSocket::Read(char *buf, size_t n) {
-    // TODO: need support handling write to ended pipe (fin)
 
     int rrequest_fd = rrequest_.GetWritefd();
     int rreply_fd   = rreply_.GetReadfd();
@@ -317,7 +152,6 @@ size_t GBNSocket::Read(char *buf, size_t n) {
 }
 
 size_t GBNSocket::Write(const char *buf, size_t n) {
-    // TODO: need support handling write to ended pipe (fin)
 
     int wrequest_fd = wrequest_.GetWritefd();
     int wreply_fd   = wreply_.GetReadfd();
@@ -327,8 +161,6 @@ size_t GBNSocket::Write(const char *buf, size_t n) {
     do{
         write(wrequest_fd,&buf,sizeof(buf));
         write(wrequest_fd,&n,sizeof(n));
-
-        fprintf(stderr,"user request write event at %p with %zu ",buf,n);
 
         // wait for write data ready
         {
@@ -359,5 +191,140 @@ void GBNSocket::Close() {
     int close_writefd = closefd_.GetWritefd();
     write(close_writefd,&pseudo,sizeof(int));
 }
+
+void GBNSocket::FireEventLoop(uint16_t errorrate,uint16_t lostrate) {
+    // basic udp listening event
+    int sockfd = sfd_.GetFd();
+    eventloop_.RegisterEvent(
+            sockfd,
+            EPOLLIN,
+            [sockfd,this](){ FrameReceived(sockfd); }
+    );
+
+    // time trigger event
+    int timerfd= tfd_.GetFd();
+    uint64_t interval = tfd_.GetInterval();
+    eventloop_.RegisterEvent(
+            timerfd,
+            EPOLLIN|EPOLLET,
+            [timerfd,interval,this](){
+                uint64_t expiration = 0;
+                read(timerfd,&expiration,sizeof(expiration));
+                this->connection_.TimeElapsed(expiration*interval);
+            }
+    );
+
+    // udp socket write event
+    int pipefd_read = pfd_.GetReadfd();
+    int pipefd_write= pfd_.GetWritefd();
+    connection_.RegisterCallBack(
+            [pipefd_write](int num){ write(pipefd_write,&num,sizeof(num)); }
+    );
+
+    if(errorrate==0&&lostrate==0)
+        eventloop_.RegisterEvent(
+                pipefd_read,
+                EPOLLIN,
+                [pipefd_read,this](){ FrameSent(pipefd_read);}
+        );
+    else
+        eventloop_.RegisterEvent(
+                pipefd_read,
+                EPOLLIN,
+                [pipefd_read,errorrate,lostrate,this](){ FrameSent(pipefd_read,errorrate,lostrate);}
+        );
+
+
+    // user socket read event
+    int rrequest_listen_fd = rrequest_.GetReadfd();
+    int rreply_fd = rreply_.GetWritefd();
+    eventloop_.RegisterEvent(
+            rrequest_listen_fd,
+            EPOLLIN,
+            [rrequest_listen_fd,rreply_fd,this]{
+                char* usr_buf; size_t n,bytes_read=0;
+                read(rrequest_listen_fd,&usr_buf,sizeof(usr_buf));
+                read(rrequest_listen_fd,&n,sizeof(n));
+
+                // only work when the stream isn't empty
+
+                if(
+                        !connection_.GetRecvStream().IsEmpty() ||
+                        connection_.GetRecvStream().IsEmpty() && connection_.IsPeerEofed() // should return zero below
+                        ){
+                    bytes_read = connection_.Read(usr_buf,n);
+                    write(rreply_fd,&bytes_read,sizeof(bytes_read));
+                    // notify the socket reader
+                    {
+                        std::unique_lock<std::mutex> lk(read_mt_);
+                        rstate_ = PASS;
+                        read_cv_.notify_one();
+                    }
+                }else{
+                    {
+                        std::unique_lock<std::mutex> lk(write_mt_);
+                        rstate_ = WCHGE;
+                    }
+                }
+            }
+    );
+
+    // user socket write event
+    int wrequest_listen_fd = wrequest_.GetReadfd();
+    int wreply_fd = wreply_.GetWritefd();
+    eventloop_.RegisterEvent(
+            wrequest_listen_fd,
+            EPOLLIN,
+            [wrequest_listen_fd,wreply_fd,this]{
+                char* usr_buf; size_t n,bytes_write=0;
+                read(wrequest_listen_fd,&usr_buf,sizeof(usr_buf));
+                read(wrequest_listen_fd,&n,sizeof(n));
+
+                fprintf(stderr,"server response write event at %p with %zu ",usr_buf,n);
+
+                // slightly imprecise here, when its not full, the write may exceed the buf length
+                if(!connection_.IsSenderFull()){
+                    fprintf(stderr,"with success\n");
+                    if(connection_.IsSelfEofed())
+                        throw std::runtime_error("write to closed pipe");
+                    bytes_write = connection_.Write(usr_buf,n);
+                    write(wreply_fd,&bytes_write,sizeof(bytes_write));
+                    {
+                        std::unique_lock<std::mutex> lk(write_mt_);
+                        wstate_ = PASS;
+                        write_cv_.notify_one();
+                    }
+                }else{
+                    fprintf(stderr,"but failed, give up\n");
+                    {
+                        std::unique_lock<std::mutex> lk(write_mt_);
+                        wstate_ = WCHGE;
+                    }
+                }
+            }
+    );
+
+    // closing event
+
+    int close_lisen = closefd_.GetReadfd();
+    eventloop_.RegisterEvent(
+            close_lisen,
+            EPOLLIN,
+            [this,close_lisen]{
+                if(!connection_.IsSelfEofed())
+                    connection_.EndInput();
+                if(connection_.IsEnded()){
+                    int pseudo;
+                    read(close_lisen,&pseudo,sizeof(pseudo));
+                    eventloop_.StopLoop();
+                }
+                // else not consume the pipe, make it poll the ended state
+            }
+    );
+
+    // launch the thread for event loop:
+    eventthread_ = std::thread(&EventLoop::Loop,&eventloop_);
+}
+
 
 

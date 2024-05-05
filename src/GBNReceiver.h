@@ -32,6 +32,8 @@ class GBNReceiver{
     uint16_t expected_seq_ = 0;
 public:
     // make sure only data pkg move to here
+    GBNReceiver(uint16_t initial_seqno = 0):expected_seq_(initial_seqno){};
+
     void PkgReceived(const GBNPDU&moved_pdu){
         if(receiver_stream_.IsEofed()) return;
         if(moved_pdu.GetNum() == expected_seq_){

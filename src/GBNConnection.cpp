@@ -5,7 +5,6 @@
 #include "GBNConnection.h"
 
 void GBNConnection::PkgReceived(const GBNPDU &moved_pkg) {
-    //TODO: need check malformed here!!
     if(moved_pkg.malformed_)
         return;
 

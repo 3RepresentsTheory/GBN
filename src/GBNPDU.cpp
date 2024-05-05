@@ -6,6 +6,16 @@
 #include <cstring>
 #include "GBNPDU.h"
 
+
+std::map<int,std::string> GBNPDU::statemap_ = {
+        {0,"New"},
+        {1,"TO"}, // Timeout retransmission
+};
+
+
+size_t GBNPDU::LARGEST_DATA_SIZE = (MAX_PKG_SIZE_-16-2);
+
+
 static void insert_u16(uint16_t n,std::string&frame){
     frame.push_back(n&0xFF);
     frame.push_back((n>>8)&0xFF);
@@ -120,6 +130,8 @@ void GBNPDU::Deserialize(const char *buf,size_t n) {
 
 
 GBNPDU::GBNPDU(GBNPDU::uint16 acknum) {
+    state_  = NOTDATA;
+
     length_ = 0;
     ackf_   = true;
     num_    = acknum;
@@ -132,6 +144,8 @@ GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) 
         malformed_ = true;
         throw std::runtime_error("GBNPDU data is too large");
     }
+    state_  = NEW;
+
     data_   = data;
     finf_   = fin;
     length_ = data_.length();
@@ -142,9 +156,15 @@ GBNPDU::GBNPDU(GBNPDU::uint16 seqnum, const std::string&data, bool fin = false) 
 }
 
 
-GBNPDU::GBNPDU(std::string &&frame) { Deserialize(frame); }
+GBNPDU::GBNPDU(std::string &&frame) {
+    state_ = NEW;
+    Deserialize(frame);
+}
 
-GBNPDU::GBNPDU(const char *buf,size_t n) { Deserialize(buf,n); }
+GBNPDU::GBNPDU(const char *buf,size_t n) {
+    state_ = NEW;
+    Deserialize(buf,n);
+}
 
 
 

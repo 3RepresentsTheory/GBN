@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <functional>
 #include "GBNByteStream.h"
+#include "GBNSocketConfig.h"
 
 
 // an alarm count for ms
@@ -63,14 +64,18 @@ private:
     Alarm    alarm_;
     uint16_t win_size_;
 
-    uint16_t seq_has_acked_ = 0; // seqnum < this has been acked
-
-    uint16_t next_seq_ = 0; // seqnum < this has been sent
+    uint16_t seq_has_acked_ ; // seqnum < this has been acked
+    uint16_t next_seq_      ; // seqnum < this has been sent
 public:
     GBNSender(
             uint16_t win_size = DEFAULT_WIN_,
-            uint16_t time_out = DEFAULT_TIME_OUT_
-    ): win_size_(win_size), alarm_(time_out){
+            uint16_t time_out = DEFAULT_TIME_OUT_,
+            uint16_t initail_seqno = 0
+    ): win_size_(win_size),
+       alarm_(time_out),
+       seq_has_acked_(initail_seqno),
+       next_seq_(initail_seqno)
+    {
         if(win_size==0)
             throw std::runtime_error("GBNSender cannot use zero window");
         notify_nwrite_ = DefaultCallBack;

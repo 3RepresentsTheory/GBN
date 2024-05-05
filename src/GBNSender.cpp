@@ -25,6 +25,7 @@ void GBNSender::TimeElasped(uint64_t ms_ticked) {
             for(auto &pkg: sender_stream_.GetFrames()) {
                 if(i==next_seq_)
                     break;
+                pkg.state_ = GBNPDU::TO;
                 sender_queue_.push_back(pkg);
                 i++;
             }

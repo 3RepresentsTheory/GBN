@@ -13,6 +13,7 @@
 #include "util/TimerfdManager.h"
 #include "util/SocketfdManager.h"
 #include "util/PipefdManager.h"
+#include "random"
 
 #include <arpa/inet.h>
 
@@ -57,6 +58,7 @@ private:
 
 
     void FrameReceived(int socketfd);
+    void FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrrate);
     void FrameSent(int eventfd);
 
 public:
@@ -76,6 +78,43 @@ public:
         if(inet_pton(AF_INET,peer_ip.c_str(),&(peer_addr_.sin_addr))<0)
             throw std::runtime_error("invalid peer address");
     }
+
+    // config version of listening socket
+    GBNSocket(
+        const GBNSocketConfig& config
+    ):
+    sfd_(config.localport_),
+    connection_(config.swsize_,config.timeout_,config.initseqno_)
+    {
+        local_port_ = config.localport_;
+        peer_addr_.sin_port =0;
+        peer_addr_.sin_addr.s_addr=0;
+
+        GBNPDU::ResetDataSize(config.datasize_);
+        FireEventLoop(config.errorrate_,config.lostrate_);
+    }
+
+    // config version of active socket
+    GBNSocket(
+            const GBNSocketConfig& config,
+            uint16_t peer_port,
+            const std::string& peer_ip
+    ):
+    sfd_(config.localport_),
+    connection_(config.swsize_,config.timeout_,config.initseqno_)
+    {
+        local_port_ = config.localport_;
+        peer_addr_.sin_family = AF_INET;
+        peer_addr_.sin_port   = htons(peer_port);
+        if(inet_pton(AF_INET,peer_ip.c_str(),&(peer_addr_.sin_addr))<0)
+            throw std::runtime_error("invalid peer address");
+
+        GBNPDU::ResetDataSize(config.datasize_);
+        FireEventLoop(config.errorrate_,config.lostrate_);
+    }
+
+    // register events and fire an event loop thread
+    void FireEventLoop(uint16_t errorrate,uint16_t lostrate);
 
     ~GBNSocket();
 

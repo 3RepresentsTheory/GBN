@@ -16,11 +16,13 @@ class GBNConnection{
 private:
     GBNReceiver receiver_;
 public:
-
     GBNConnection(
             uint16_t win_size,
-            uint16_t time_out
-    ): sender_(win_size,time_out){};
+            uint16_t time_out,
+            uint16_t initial_seqno
+    ):
+    sender_(win_size,time_out,initial_seqno),
+    receiver_(initial_seqno){};
 
     GBNConnection(){}
 

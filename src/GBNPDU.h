@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <string>
 #include <stdexcept>
+#include <map>
 
 
 /*
@@ -57,10 +58,20 @@ class GBNPDU{
 
 
 public:
+    enum {
+        NEW,
+        TO,
+        RECV,
+        NOTDATA
+    }pdustate_;
+    int state_;
+
+    static std::map<int,std::string> statemap_;
 
     // TODO: udp max package size and alignment
-    constexpr static size_t LARGEST_DATA_SIZE =
-            (MAX_PKG_SIZE_-16-2);
+    static size_t LARGEST_DATA_SIZE;
+
+    static void ResetDataSize(size_t datasize){LARGEST_DATA_SIZE=datasize;}
 
     // generate ack  package
     GBNPDU(uint16 acknum);
