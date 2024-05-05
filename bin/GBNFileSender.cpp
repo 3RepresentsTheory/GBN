@@ -4,10 +4,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <cstring>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include "../src/GBNSocket.h"
 
 int main(int argc, char* argv[]) {

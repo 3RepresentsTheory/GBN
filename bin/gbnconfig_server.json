@@ -1,10 +1,10 @@
 {
-  "description": "this json only support 16bits fields except for DataSize",
-  "UDPPort": 51224,
-  "DataSize": 2048,
-  "ErrorRate": 10,
-  "LostRate": 10,
-  "SWSize": 4,
-  "InitSeqNo": 1,
-  "Timeout": 1000
+    "description": "this json only support 16bits fields except for DataSize",
+    "UDPPort": 51224,
+    "DataSize": 2048,
+    "ErrorRate": 10,
+    "LostRate": 10,
+    "SWSize": 32,
+    "InitSeqNo": 1,
+    "Timeout": 200
 }

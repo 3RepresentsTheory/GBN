@@ -148,8 +148,10 @@ void GBNSocket::FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrate) {
 
         auto &&serial = pkg.Serialize();
 
-        if(!los_distrib(gen) || pkg.Fin()){
-            if(err_distrib(gen) && !pkg.Fin()){
+        bool islast_ack_pkg = pkg.ackf_ && (pkg.GetNum()==connection_.GetExpectAck()-1) && connection_.IsPeerEofed();
+
+        if(!los_distrib(gen) || pkg.Fin() || islast_ack_pkg){
+            if(err_distrib(gen) && !pkg.Fin() && !islast_ack_pkg){
                 std::uniform_int_distribution<> uni_distrib(0,serial.size());
                 serial[uni_distrib(gen)] ^= 0xFF; // flip the bytes
             }
