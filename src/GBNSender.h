@@ -100,6 +100,8 @@ public:
 
     std::deque<GBNPDU>&GetSenderQueue(){return sender_queue_;};
     ByteStream &GetStream(){return sender_stream_;};
+
+    uint16_t GetHasAcked(){return seq_has_acked_;}
 };
 
 #endif //GOBACKN_GBNSENDER_H

@@ -61,6 +61,9 @@ private:
     void FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrrate);
     void FrameSent(int eventfd);
 
+    void SentPkgLog(const GBNPDU&pkg);
+    void RecvPkgLog(const GBNPDU&pkg);
+
 public:
     // create a listening socket
     GBNSocket(

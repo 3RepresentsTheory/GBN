@@ -29,7 +29,7 @@
 
 class GBNReceiver{
     ByteStream receiver_stream_;
-    uint16_t expected_seq_ = 0;
+    uint16_t expected_seq_ ;
 public:
     // make sure only data pkg move to here
     GBNReceiver(uint16_t initial_seqno = 0):expected_seq_(initial_seqno){};

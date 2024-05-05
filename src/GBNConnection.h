@@ -58,6 +58,9 @@ public:
         return sender_.GetStream().IsEofed();
     }
 
+    uint16_t GetAckedPlus1(){return sender_.GetHasAcked();}
+    uint16_t GetExpectAck() {return receiver_.GetRecvNum();}
+
     GBNSender   sender_;
 };
 

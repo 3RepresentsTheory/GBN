@@ -4,8 +4,7 @@
 
 #include <iostream>
 #include "GBNSocket.h"
-
-
+#include "util/Timestamp.h"
 
 
 GBNSocket::GBNSocket(
@@ -31,6 +30,48 @@ GBNSocket::~GBNSocket() {
     Close();
     eventthread_.join();
 }
+
+void GBNSocket::SentPkgLog(const GBNPDU& pkg){
+    // adding logging here: sending log
+    if(pkg.ackf_){
+        fprintf(stderr,"[%s], ack_to_send=%d\n",formatTime().c_str(),pkg.GetNum());
+    }else{
+        fprintf(stderr,"[%s], pdu_to_send=%d,status=%s,ackedNo=%s,isfin=%s\n",
+                formatTime().c_str(),
+                pkg.GetNum(),
+                GBNPDU::statemap_[pkg.state_].c_str(),
+                (connection_.GetAckedPlus1()==0)?
+                "(null)":
+                std::to_string(connection_.GetAckedPlus1()-1).c_str(),
+                (pkg.Fin())?"true":"false"
+        );
+    }
+}
+
+void GBNSocket::RecvPkgLog(const GBNPDU &pkg) {
+    // logic duplicate to PkgReceive
+    const char* status;
+    if(pkg.malformed_){
+        fprintf(stderr,"[%s], status=[%s]\n",formatTime().c_str(),status);
+    } else if(pkg.ackf_){
+        fprintf(stderr,"[%s], ack_to_recv=%d,status=OK\n",formatTime().c_str(),pkg.GetNum());
+    } else {
+        if(pkg.GetNum()!=connection_.GetExpectAck())
+            status = "NoErr";
+        else if(connection_.GetRecvStream().IsEofed())
+            status = "AfterEof";
+        else
+            status = "OK";
+
+        fprintf(stderr,"[%s], pdu_exp=%d,pdu_recv=%d,status=%s,isfin=%s\n",
+                formatTime().c_str(),
+                connection_.GetExpectAck(),
+                pkg.GetNum(),
+                status,
+                (pkg.Fin())?"true":"false"
+        );
+    }
+}
 static const char*n2hex = "0123456789ABCDEF";
 
 constexpr int BUFFER_SIZE = 65507 ; // max udp package
@@ -50,6 +91,8 @@ void GBNSocket::FrameReceived(int socketfd) {
             );
 
     auto && temp_pkg =GBNPDU(buffer,bytesRead);
+
+    RecvPkgLog(temp_pkg);
 
     connection_.PkgReceived(temp_pkg);
 
@@ -77,6 +120,7 @@ void GBNSocket::FrameReceived(int socketfd) {
 }
 
 
+
 void GBNSocket::FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrate) {
     static std::random_device rd;
     static std::mt19937 gen(rd());
@@ -98,6 +142,8 @@ void GBNSocket::FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrate) {
     auto & sentq = connection_.GetWaitToSent();
     for (int i = 0; i < sentnum && !sentq.empty(); ++i) {
         auto &pkg = sentq.front();
+
+        SentPkgLog(pkg);
 
         auto &&serial = pkg.Serialize();
 
@@ -143,6 +189,8 @@ void GBNSocket::FrameSent(int eventfd) {
     auto & sentq = connection_.GetWaitToSent();
     for (int i = 0; i < sentnum && !sentq.empty(); ++i) {
         auto &pkg = sentq.front();
+
+        SentPkgLog(pkg);
 
         auto &&serial = pkg.Serialize();
 
@@ -366,6 +414,7 @@ void GBNSocket::FireEventLoop(uint16_t errorrate,uint16_t lostrate) {
     // launch the thread for event loop:
     eventthread_ = std::thread(&EventLoop::Loop,&eventloop_);
 }
+
 
 
 
