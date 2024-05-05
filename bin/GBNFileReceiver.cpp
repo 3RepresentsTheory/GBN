@@ -11,8 +11,9 @@ int main(int argc, char* argv[]){
         std::cerr << "Usage: " << argv[0] << " <output_filename>" << std::endl;
         return 1;
     }
-    uint16_t port = 1234;
-    GBNSocket server(port);
+
+    GBNSocketConfig config("gbnconfig_server.json");
+    GBNSocket server(config);
 
     const std::string outputFilename = argv[1];
 

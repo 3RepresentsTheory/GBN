@@ -16,11 +16,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-//    uint16_t local_port = std::stoi(argv[1]);
-//    uint16_t peer_port = std::stoi(argv[2]);
-//    const std::string peer_ip = argv[3];
-    uint16_t local_port = 5678;
-    uint16_t peer_port  = 1234;
+    GBNSocketConfig config("gbnconfig_client.json");
     const std::string filename = argv[1];
 
     std::ifstream file(filename, std::ios::binary);
@@ -29,7 +25,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    GBNSocket sender(local_port,peer_port,"127.0.0.1");
+    GBNSocket sender(config,51224,"127.0.0.1");
 
     // 发送文件内容
     char buffer[1024];

@@ -86,6 +86,47 @@ void GBNSocket::FrameSent(int eventfd,uint16_t errorrate,uint16_t lostrate) {
     std::discrete_distribution<> err_distrib({ 1-errorrate_p, errorrate_p });
     std::discrete_distribution<> los_distrib({ 1-lostrate_p,  lostrate_p });
 
+    if(peer_addr_.sin_port==0)
+        throw std::runtime_error("GBNSocket: set peer address first!");
+    int sentnum;
+    // temp no checking
+    read(eventfd,&sentnum,sizeof(sentnum));
+
+//    fprintf(stderr,"frame sent, there is %d pkg wait to sent\n",sentnum);
+
+    int sockfd = sfd_.GetFd();
+    auto & sentq = connection_.GetWaitToSent();
+    for (int i = 0; i < sentnum && !sentq.empty(); ++i) {
+        auto &pkg = sentq.front();
+
+        auto &&serial = pkg.Serialize();
+
+        if(!los_distrib(gen) || pkg.Fin()){
+            if(err_distrib(gen) && !pkg.Fin()){
+                std::uniform_int_distribution<> uni_distrib(0,serial.size());
+                serial[uni_distrib(gen)] ^= 0xFF; // flip the bytes
+            }
+
+            // sent successfully
+            ssize_t bytesSent = sendto(
+                    sockfd,
+                    serial.c_str(),
+                    serial.size(),
+                    0,
+                    reinterpret_cast<sockaddr*>(&peer_addr_),
+                    sizeof(peer_addr_)
+            );
+            if(bytesSent<0){
+                char *p = strerror(errno);
+                std::cout << peer_addr_.sin_port << std::endl;
+                std::cout << peer_addr_.sin_addr.s_addr << std::endl;
+                throw std::runtime_error("GBNSocket: failed to sent package" + std::string(p,strlen(p)));
+            }
+        }
+
+        sentq.pop_front();
+    }
+
 }
 
 void GBNSocket::FrameSent(int eventfd) {
