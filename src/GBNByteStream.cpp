@@ -12,18 +12,18 @@ size_t ByteStream::Read(char *buffer, size_t n) {
     while(!pdu_frames_.empty()&&n!=0){
 
         auto &pkg = pdu_frames_.front();
-        fprintf(stderr,
-                "picking frame(%p) with PDU data: num %d, len %zu, and data: \n",
-                &pkg,
-                pkg.GetNum(),
-                pkg.GetLen()
-        );
-        for (int i = 0; i < pkg.GetLen(); ++i) {
-            unsigned char x = pkg.GetData()[i];
-            fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
-            if(i%2==1) fprintf(stderr," ");
-        }
-        fprintf(stderr,"\n");
+//        fprintf(stderr,
+//                "picking frame(%p) with PDU data: num %d, len %zu, and data: \n",
+//                &pkg,
+//                pkg.GetNum(),
+//                pkg.GetLen()
+//        );
+//        for (int i = 0; i < pkg.GetLen(); ++i) {
+//            unsigned char x = pkg.GetData()[i];
+//            fprintf(stderr,"%c%c",n2hex[(x&0xF0)>>4],n2hex[x&0xF]);
+//            if(i%2==1) fprintf(stderr," ");
+//        }
+//        fprintf(stderr,"\n");
 
         size_t avail_len   = pkg.GetLen()-has_readn_;
         size_t actual_len  = std::min(avail_len,n);

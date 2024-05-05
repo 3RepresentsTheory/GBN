@@ -52,7 +52,8 @@ void GBNSocket::RecvPkgLog(const GBNPDU &pkg) {
     // logic duplicate to PkgReceive
     const char* status;
     if(pkg.malformed_){
-        fprintf(stderr,"[%s], status=[%s]\n",formatTime().c_str(),status);
+        status = "DataErr";
+        fprintf(stderr,"[%s], status=%s\n",formatTime().c_str(),status);
     } else if(pkg.ackf_){
         fprintf(stderr,"[%s], ack_to_recv=%d,status=OK\n",formatTime().c_str(),pkg.GetNum());
     } else {
@@ -369,11 +370,11 @@ void GBNSocket::FireEventLoop(uint16_t errorrate,uint16_t lostrate) {
                 read(wrequest_listen_fd,&usr_buf,sizeof(usr_buf));
                 read(wrequest_listen_fd,&n,sizeof(n));
 
-                fprintf(stderr,"server response write event at %p with %zu ",usr_buf,n);
+//                fprintf(stderr,"server response write event at %p with %zu ",usr_buf,n);
 
                 // slightly imprecise here, when its not full, the write may exceed the buf length
                 if(!connection_.IsSenderFull()){
-                    fprintf(stderr,"with success\n");
+//                    fprintf(stderr,"with success\n");
                     if(connection_.IsSelfEofed())
                         throw std::runtime_error("write to closed pipe");
                     bytes_write = connection_.Write(usr_buf,n);
@@ -384,7 +385,7 @@ void GBNSocket::FireEventLoop(uint16_t errorrate,uint16_t lostrate) {
                         write_cv_.notify_one();
                     }
                 }else{
-                    fprintf(stderr,"but failed, give up\n");
+//                    fprintf(stderr,"but failed, give up\n");
                     {
                         std::unique_lock<std::mutex> lk(write_mt_);
                         wstate_ = WCHGE;

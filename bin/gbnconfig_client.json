@@ -1,7 +1,7 @@
 {
   "description": "this json only support 16bits fields except for DataSize",
   "UDPPort": 41224,
-  "DataSize": 65537,
+  "DataSize": 2048,
   "ErrorRate": 10,
   "LostRate": 10,
   "SWSize": 4,
